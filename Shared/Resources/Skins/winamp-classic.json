@@ -1,19 +1,20 @@
 {
   "id": "winamp-classic",
   "name": "Winamp Classic",
-  "background": { "color": "#2B2B2B" },
+  "background": { "color": "#000000" },
   "border": { "color": "#4A4A4A", "width": 1 },
   "clock": {
     "style": "sprite",
     "color": "#00FF00",
     "position": { "x": 0.5, "y": 0.45 }
   },
-  "decorations": [
-    { "type": "text", "color": "#00FF00", "text": "RETRO CLOCK", "position": { "x": 0.5, "y": 0.12 }, "fontSize": 8 }
-  ],
+  "decorations": [],
   "images": {
     "directory": "winamp-classic",
     "background": "main.png",
+    "backgroundSmall": "bg-small.png",
+    "backgroundMedium": "bg-medium.png",
+    "backgroundLarge": "bg-large.png",
     "numbers": "numbers.png",
     "titlebar": "titlebar.png",
     "digitWidth": 9,

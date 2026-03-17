@@ -1,7 +1,7 @@
 {
   "id": "dark-materia",
   "name": "Dark Materia",
-  "background": { "color": "#808080" },
+  "background": { "color": "#5B6263" },
   "border": { "color": "#C080C0", "width": 1 },
   "clock": {
     "style": "sprite",
@@ -12,6 +12,9 @@
   "images": {
     "directory": "dark-materia",
     "background": "main.png",
+    "backgroundSmall": "bg-small.png",
+    "backgroundMedium": "bg-medium.png",
+    "backgroundLarge": "bg-large.png",
     "numbers": "numbers.png",
     "titlebar": "titlebar.png",
     "digitWidth": 9,

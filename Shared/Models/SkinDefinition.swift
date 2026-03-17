@@ -44,6 +44,9 @@ struct SkinDefinition: Codable, Identifiable, Hashable {
     struct SkinImages: Codable, Hashable {
         let directory: String
         let background: String?
+        let backgroundSmall: String?
+        let backgroundMedium: String?
+        let backgroundLarge: String?
         let numbers: String?
         let titlebar: String?
         let digitWidth: CGFloat?

@@ -16,7 +16,6 @@ struct RetroClockProvider: TimelineProvider {
         let now = Date()
         let calendar = Calendar.current
 
-        // Generate entries for the next 60 minutes (one per minute)
         var entries: [ClockEntry] = []
         for minuteOffset in 0..<60 {
             guard let entryDate = calendar.date(byAdding: .minute, value: minuteOffset, to: now) else { continue }
@@ -30,10 +29,11 @@ struct RetroClockProvider: TimelineProvider {
 }
 
 struct RetroClockWidgetEntryView: View {
+    @Environment(\.widgetFamily) var family
     var entry: RetroClockProvider.Entry
 
     var body: some View {
-        RetroClockView(entry: entry)
+        RetroClockView(entry: entry, family: family)
     }
 }
 
@@ -49,7 +49,7 @@ struct RetroClockWidget: Widget {
         }
         .configurationDisplayName("Retro Clock")
         .description("A retro-style clock widget with customizable skins.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
         .contentMarginsDisabled()
     }
 }

@@ -4,16 +4,18 @@ import WidgetKit
 struct RetroClockView: View {
     let entry: ClockEntry
     let skin: SkinDefinition
+    let family: WidgetFamily
 
-    init(entry: ClockEntry) {
+    init(entry: ClockEntry, family: WidgetFamily = .systemMedium) {
         self.entry = entry
         self.skin = entry.skin
+        self.family = family
     }
 
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                // Background: image or solid color
+                // Background: size-specific image or fallback
                 backgroundLayer(in: geo.size)
 
                 // Decorations layer
@@ -41,9 +43,7 @@ struct RetroClockView: View {
 
     @ViewBuilder
     private func backgroundLayer(in size: CGSize) -> some View {
-        if let images = skin.images,
-           let bgName = images.background,
-           let bgImage = loadImage(named: bgName, in: images.directory) {
+        if let bgImage = loadSizedBackground() {
             Image(uiImage: bgImage)
                 .interpolation(.none)
                 .resizable()
@@ -55,6 +55,27 @@ struct RetroClockView: View {
         }
     }
 
+    private func loadSizedBackground() -> UIImage? {
+        guard let images = skin.images else { return nil }
+
+        // Try size-specific background first
+        let sizedName: String? = switch family {
+        case .systemSmall:  images.backgroundSmall ?? "bg-small.png"
+        case .systemMedium: images.backgroundMedium ?? "bg-medium.png"
+        case .systemLarge:  images.backgroundLarge ?? "bg-large.png"
+        default:            images.background
+        }
+
+        if let name = sizedName, let img = loadImage(named: name, in: images.directory) {
+            return img
+        }
+        // Fall back to generic background
+        if let bg = images.background {
+            return loadImage(named: bg, in: images.directory)
+        }
+        return nil
+    }
+
     // MARK: - Sprite Clock
 
     @ViewBuilder
@@ -62,7 +83,7 @@ struct RetroClockView: View {
         let timeStr = formatTime(entry.date)
         let digitW = images.digitWidth ?? 9
         let digitH = images.digitHeight ?? 13
-        let scale = skin.clock.scale ?? max(size.height / 50, 2)
+        let scale = skin.clock.scale ?? scaleForFamily(size: size)
 
         if let numbersName = images.numbers,
            let spriteSheet = loadImage(named: numbersName, in: images.directory) {
@@ -77,6 +98,15 @@ struct RetroClockView: View {
                 x: size.width * skin.clock.position.x,
                 y: size.height * skin.clock.position.y
             )
+        }
+    }
+
+    private func scaleForFamily(size: CGSize) -> CGFloat {
+        switch family {
+        case .systemSmall:  return max(size.height / 55, 2)
+        case .systemMedium: return max(size.height / 45, 2.5)
+        case .systemLarge:  return max(size.height / 80, 3)
+        default:            return 2.5
         }
     }
 
@@ -119,11 +149,9 @@ struct RetroClockView: View {
         let baseName = (name as NSString).deletingPathExtension
         let ext = (name as NSString).pathExtension
 
-        // Try Skins/<directory>/<name>
         if let url = Bundle.main.url(forResource: baseName, withExtension: ext, subdirectory: "Skins/\(directory)") {
             return UIImage(contentsOfFile: url.path)
         }
-        // Try direct path construction
         if let bundlePath = Bundle.main.resourcePath {
             let path = "\(bundlePath)/Skins/\(directory)/\(name)"
             if let image = UIImage(contentsOfFile: path) {
