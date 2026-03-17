@@ -1,0 +1,17 @@
+{
+  "id": "vaporwave",
+  "name": "V A P O R W A V E",
+  "background": { "color": "#1A0033" },
+  "border": { "color": "#FF00FF", "width": 2 },
+  "clock": {
+    "style": "digital",
+    "font": "Menlo-Bold",
+    "color": "#FF69B4",
+    "position": { "x": 0.5, "y": 0.45 }
+  },
+  "decorations": [
+    { "type": "line", "color": "#FF00FF", "from": [0.05, 0.78], "to": [0.95, 0.78] },
+    { "type": "line", "color": "#00FFFF", "from": [0.05, 0.82], "to": [0.95, 0.82] },
+    { "type": "text", "color": "#00FFFF", "text": "aesthetics", "position": { "x": 0.5, "y": 0.15 }, "fontSize": 9 }
+  ]
+}

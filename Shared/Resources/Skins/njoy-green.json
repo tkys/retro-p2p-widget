@@ -1,0 +1,20 @@
+{
+  "id": "njoy-green",
+  "name": "NJOY Green",
+  "background": { "color": "#0A1A0A" },
+  "border": { "color": "#2A5A2A", "width": 1 },
+  "clock": {
+    "style": "sprite",
+    "color": "#00FF00",
+    "position": { "x": 0.5, "y": 0.45 }
+  },
+  "decorations": [],
+  "images": {
+    "directory": "njoy-green",
+    "background": "main.png",
+    "numbers": "numbers.png",
+    "titlebar": "titlebar.png",
+    "digitWidth": 9,
+    "digitHeight": 13
+  }
+}
