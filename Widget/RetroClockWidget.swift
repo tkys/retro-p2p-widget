@@ -49,7 +49,7 @@ struct RetroClockWidget: Widget {
         }
         .configurationDisplayName("Retro Clock")
         .description("A retro-style clock widget with customizable skins.")
-        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .systemExtraLarge])
         .contentMarginsDisabled()
     }
 }

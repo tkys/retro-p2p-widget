@@ -1,6 +1,87 @@
 import SwiftUI
 import WidgetKit
 
+// Winamp classic skin fixed layout (275×116 canvas)
+private enum WinampLayout {
+    static let canvasWidth: CGFloat = 275
+    static let canvasHeight: CGFloat = 116
+
+    // Time display: #time container at (39, 26), 59×13
+    // Center of time digits ≈ (68.5, 32.5)
+    static let timeCenterX: CGFloat = 68.5
+    static let timeCenterY: CGFloat = 32.5
+
+    // Marquee: (111, 24), 154×6 → center (188, 27)
+    static let marqueeCenterX: CGFloat = 188
+    static let marqueeCenterY: CGFloat = 27
+
+    // Kbps: (111, 43), 15×6 → center (118.5, 46)
+    static let kbpsCenterX: CGFloat = 118.5
+    static let kbpsCenterY: CGFloat = 46
+
+    // Khz: (156, 43), 10×6 → center (161, 46)
+    static let khzCenterX: CGFloat = 161
+    static let khzCenterY: CGFloat = 46
+
+    // Composed image sizes (from compose-skin.sh @2x)
+    // Medium: 720×338, main scaled to 720 wide, centered vertically
+    // Large:  720×752, main placed at top
+    // Small:  338×338, left 130px of main cropped and stretched
+
+    struct ImageLayout {
+        let imageWidth: CGFloat
+        let imageHeight: CGFloat
+        let mainScale: CGFloat
+        let mainOffsetX: CGFloat
+        let mainOffsetY: CGFloat
+    }
+
+    static func layout(for family: WidgetFamily) -> ImageLayout {
+        switch family {
+        case .systemSmall:
+            // Crop: left 130px of 275×116, stretched to 338×338
+            let scaleX: CGFloat = 338.0 / 130.0  // 2.6
+            let scaleY: CGFloat = 338.0 / 116.0  // 2.914
+            return ImageLayout(imageWidth: 338, imageHeight: 338,
+                               mainScale: scaleX, mainOffsetX: 0, mainOffsetY: 0)
+        case .systemMedium:
+            // main scaled to 720 wide: scale = 720/275 ≈ 2.618
+            let scale: CGFloat = 720.0 / 275.0
+            let scaledH = 116.0 * scale  // ≈ 303.7
+            let yOffset = (338.0 - scaledH) / 2.0  // ≈ 17.1
+            return ImageLayout(imageWidth: 720, imageHeight: 338,
+                               mainScale: scale, mainOffsetX: 0, mainOffsetY: yOffset)
+        case .systemLarge:
+            // main scaled to 720 wide, placed at top (y=0)
+            let scale: CGFloat = 720.0 / 275.0
+            return ImageLayout(imageWidth: 720, imageHeight: 752,
+                               mainScale: scale, mainOffsetX: 0, mainOffsetY: 0)
+        default:
+            let scale: CGFloat = 720.0 / 275.0
+            return ImageLayout(imageWidth: 720, imageHeight: 338,
+                               mainScale: scale, mainOffsetX: 0, mainOffsetY: 0)
+        }
+    }
+
+    /// Convert Winamp canvas coordinates to relative position (0-1) for a given widget family
+    static func relativePosition(canvasX: CGFloat, canvasY: CGFloat, family: WidgetFamily) -> CGPoint {
+        let l = layout(for: family)
+
+        if family == .systemSmall {
+            // Small uses crop of left 130px, stretched non-uniformly
+            let scaleX: CGFloat = 338.0 / 130.0
+            let scaleY: CGFloat = 338.0 / 116.0
+            let px = (canvasX * scaleX) / l.imageWidth
+            let py = (canvasY * scaleY) / l.imageHeight
+            return CGPoint(x: px, y: py)
+        }
+
+        let px = (canvasX * l.mainScale + l.mainOffsetX) / l.imageWidth
+        let py = (canvasY * l.mainScale + l.mainOffsetY) / l.imageHeight
+        return CGPoint(x: px, y: py)
+    }
+}
+
 struct RetroClockView: View {
     let entry: ClockEntry
     let skin: SkinDefinition
@@ -15,17 +96,10 @@ struct RetroClockView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                // Background: size-specific image or fallback
                 backgroundLayer(in: geo.size)
 
-                // Decorations layer
-                ForEach(Array(skin.decorations.enumerated()), id: \.offset) { _, decoration in
-                    decorationView(decoration, in: geo.size)
-                }
-
-                // Clock display
-                if skin.clock.style == "sprite", let images = skin.images {
-                    spriteClockLayer(images: images, in: geo.size)
+                if skin.hasImageAssets {
+                    winampLayout(in: geo.size)
                 } else {
                     textClockLayer(in: geo.size)
                 }
@@ -37,6 +111,94 @@ struct RetroClockView: View {
                     .padding(skin.border.width / 2)
             )
         }
+    }
+
+    // MARK: - Winamp Layout (auto-positioned)
+
+    @ViewBuilder
+    private func winampLayout(in size: CGSize) -> some View {
+        let timePos = WinampLayout.relativePosition(
+            canvasX: WinampLayout.timeCenterX,
+            canvasY: WinampLayout.timeCenterY,
+            family: family
+        )
+
+        // Sprite clock digits at Winamp time position
+        if let images = skin.images,
+           let numbersName = images.numbers,
+           let spriteSheet = loadImage(named: numbersName, in: images.directory) {
+            let digitW = images.digitWidth ?? 9
+            let digitH = images.digitHeight ?? 13
+            let scale = spriteScale(in: size)
+
+            SpriteNumberView(
+                timeString: formatTime(entry.date),
+                spriteSheet: spriteSheet,
+                digitWidth: digitW,
+                digitHeight: digitH,
+                scale: scale
+            )
+            .position(
+                x: size.width * timePos.x,
+                y: size.height * timePos.y
+            )
+        }
+
+        // Marquee area: show date
+        let marqueePos = WinampLayout.relativePosition(
+            canvasX: WinampLayout.marqueeCenterX,
+            canvasY: WinampLayout.marqueeCenterY,
+            family: family
+        )
+        Text(entry.date, style: .date)
+            .font(.system(size: marqueeFont, design: .monospaced))
+            .foregroundStyle(skin.clockColor)
+            .lineLimit(1)
+            .position(
+                x: size.width * marqueePos.x,
+                y: size.height * marqueePos.y
+            )
+
+        // Kbps area: show day of week
+        let kbpsPos = WinampLayout.relativePosition(
+            canvasX: WinampLayout.kbpsCenterX,
+            canvasY: WinampLayout.kbpsCenterY,
+            family: family
+        )
+        Text(dayOfWeek(entry.date))
+            .font(.system(size: subInfoFont, design: .monospaced))
+            .foregroundStyle(skin.clockColor.opacity(0.8))
+            .position(
+                x: size.width * kbpsPos.x,
+                y: size.height * kbpsPos.y
+            )
+    }
+
+    private var marqueeFont: CGFloat {
+        switch family {
+        case .systemSmall:  return 9
+        case .systemMedium: return 10
+        case .systemLarge:  return 12
+        default: return 10
+        }
+    }
+
+    private var subInfoFont: CGFloat {
+        switch family {
+        case .systemSmall:  return 7
+        case .systemMedium: return 8
+        case .systemLarge:  return 10
+        default: return 8
+        }
+    }
+
+    private func spriteScale(in size: CGSize) -> CGFloat {
+        let l = WinampLayout.layout(for: family)
+        // Scale sprite digits to match how main.bmp was scaled in the composed image
+        // Then adjust for actual widget size vs composed image size
+        let composedScale = l.mainScale
+        let widgetToImageRatio = size.width / l.imageWidth
+        return composedScale * widgetToImageRatio
     }
 
     // MARK: - Background
@@ -58,7 +220,6 @@ struct RetroClockView: View {
     private func loadSizedBackground() -> UIImage? {
         guard let images = skin.images else { return nil }
 
-        // Try size-specific background first
         let sizedName: String? = switch family {
         case .systemSmall:  images.backgroundSmall ?? "bg-small.png"
         case .systemMedium: images.backgroundMedium ?? "bg-medium.png"
@@ -69,48 +230,13 @@ struct RetroClockView: View {
         if let name = sizedName, let img = loadImage(named: name, in: images.directory) {
             return img
         }
-        // Fall back to generic background
         if let bg = images.background {
             return loadImage(named: bg, in: images.directory)
         }
         return nil
     }
 
-    // MARK: - Sprite Clock
-
-    @ViewBuilder
-    private func spriteClockLayer(images: SkinDefinition.SkinImages, in size: CGSize) -> some View {
-        let timeStr = formatTime(entry.date)
-        let digitW = images.digitWidth ?? 9
-        let digitH = images.digitHeight ?? 13
-        let scale = skin.clock.scale ?? scaleForFamily(size: size)
-
-        if let numbersName = images.numbers,
-           let spriteSheet = loadImage(named: numbersName, in: images.directory) {
-            SpriteNumberView(
-                timeString: timeStr,
-                spriteSheet: spriteSheet,
-                digitWidth: digitW,
-                digitHeight: digitH,
-                scale: scale
-            )
-            .position(
-                x: size.width * skin.clock.position.x,
-                y: size.height * skin.clock.position.y
-            )
-        }
-    }
-
-    private func scaleForFamily(size: CGSize) -> CGFloat {
-        switch family {
-        case .systemSmall:  return max(size.height / 55, 2)
-        case .systemMedium: return max(size.height / 45, 2.5)
-        case .systemLarge:  return max(size.height / 80, 3)
-        default:            return 2.5
-        }
-    }
-
-    // MARK: - Text Clock (fallback)
+    // MARK: - Text Clock (fallback for non-image skins)
 
     @ViewBuilder
     private func textClockLayer(in size: CGSize) -> some View {
@@ -145,6 +271,12 @@ struct RetroClockView: View {
         return formatter.string(from: date)
     }
 
+    private func dayOfWeek(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE"
+        return formatter.string(from: date).uppercased()
+    }
+
     private func loadImage(named name: String, in directory: String) -> UIImage? {
         let baseName = (name as NSString).deletingPathExtension
         let ext = (name as NSString).pathExtension
@@ -159,30 +291,5 @@ struct RetroClockView: View {
             }
         }
         return nil
-    }
-
-    @ViewBuilder
-    private func decorationView(_ decoration: SkinDefinition.Decoration, in size: CGSize) -> some View {
-        let color = Color(hex: decoration.color)
-        switch decoration.type {
-        case "line":
-            if let from = decoration.from, let to = decoration.to,
-               from.count == 2, to.count == 2 {
-                Path { path in
-                    path.move(to: CGPoint(x: size.width * from[0], y: size.height * from[1]))
-                    path.addLine(to: CGPoint(x: size.width * to[0], y: size.height * to[1]))
-                }
-                .stroke(color, lineWidth: 1)
-            }
-        case "text":
-            if let text = decoration.text, let pos = decoration.position {
-                Text(text)
-                    .font(.system(size: decoration.fontSize ?? 10, design: .monospaced))
-                    .foregroundStyle(color)
-                    .position(x: size.width * pos.x, y: size.height * pos.y)
-            }
-        default:
-            EmptyView()
-        }
     }
 }
