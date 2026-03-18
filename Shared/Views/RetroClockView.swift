@@ -25,7 +25,7 @@ private enum WinampLayout {
 
     // Composed image sizes (from compose-skin.sh @2x)
     // Medium: 720×338, main scaled to 720 wide, centered vertically
-    // Large:  720×752, main placed at top
+    // Large:  720×752, main top-aligned, EQ + playlist stacked below
     // Small:  338×338, left 130px of main cropped and stretched
 
     struct ImageLayout {
@@ -52,10 +52,17 @@ private enum WinampLayout {
             return ImageLayout(imageWidth: 720, imageHeight: 338,
                                mainScale: scale, mainOffsetX: 0, mainOffsetY: yOffset)
         case .systemLarge:
-            // main scaled to 720 wide, placed at top (y=0)
+            // main scaled to 720 wide, top-aligned (Winamp stacked layout: main → EQ → playlist)
             let scale: CGFloat = 720.0 / 275.0
+            let yOffset: CGFloat = 0
             return ImageLayout(imageWidth: 720, imageHeight: 752,
-                               mainScale: scale, mainOffsetX: 0, mainOffsetY: 0)
+                               mainScale: scale, mainOffsetX: 0, mainOffsetY: yOffset)
+        case .systemExtraLarge:
+            // Extra large follows systemLarge layout (top-aligned)
+            let scale: CGFloat = 720.0 / 275.0
+            let yOffset: CGFloat = 0
+            return ImageLayout(imageWidth: 720, imageHeight: 752,
+                               mainScale: scale, mainOffsetX: 0, mainOffsetY: yOffset)
         default:
             let scale: CGFloat = 720.0 / 275.0
             return ImageLayout(imageWidth: 720, imageHeight: 338,
@@ -136,7 +143,8 @@ struct RetroClockView: View {
                 spriteSheet: spriteSheet,
                 digitWidth: digitW,
                 digitHeight: digitH,
-                scale: scale
+                scale: scale,
+                colonColor: skin.clockColor
             )
             .position(
                 x: size.width * timePos.x,
@@ -144,13 +152,14 @@ struct RetroClockView: View {
             )
         }
 
-        // Marquee area: show date
+        // Marquee area: show date or custom data
         let marqueePos = WinampLayout.relativePosition(
             canvasX: WinampLayout.marqueeCenterX,
             canvasY: WinampLayout.marqueeCenterY,
             family: family
         )
-        Text(entry.date, style: .date)
+        let marqueeText = dataText(for: .marquee)
+        Text(marqueeText ?? dateString(entry.date))
             .font(.system(size: marqueeFont, design: .monospaced))
             .foregroundStyle(skin.clockColor)
             .lineLimit(1)
@@ -159,36 +168,27 @@ struct RetroClockView: View {
                 y: size.height * marqueePos.y
             )
 
-        // Kbps area: show day of week
-        let kbpsPos = WinampLayout.relativePosition(
-            canvasX: WinampLayout.kbpsCenterX,
-            canvasY: WinampLayout.kbpsCenterY,
-            family: family
-        )
-        Text(dayOfWeek(entry.date))
-            .font(.system(size: subInfoFont, design: .monospaced))
-            .foregroundStyle(skin.clockColor.opacity(0.8))
-            .position(
-                x: size.width * kbpsPos.x,
-                y: size.height * kbpsPos.y
-            )
+        // Data overlay zones for systemLarge / systemExtraLarge
+        if family == .systemLarge || family == .systemExtraLarge {
+            dataOverlay(in: size)
+        }
     }
 
     private var marqueeFont: CGFloat {
         switch family {
-        case .systemSmall:  return 9
-        case .systemMedium: return 10
-        case .systemLarge:  return 12
-        default: return 10
+        case .systemSmall:  return 10
+        case .systemMedium: return 12
+        case .systemLarge:  return 14
+        default: return 12
         }
     }
 
     private var subInfoFont: CGFloat {
         switch family {
-        case .systemSmall:  return 7
-        case .systemMedium: return 8
-        case .systemLarge:  return 10
-        default: return 8
+        case .systemSmall:  return 8
+        case .systemMedium: return 10
+        case .systemLarge:  return 12
+        default: return 10
         }
     }
 
@@ -199,6 +199,62 @@ struct RetroClockView: View {
         let composedScale = l.mainScale
         let widgetToImageRatio = size.width / l.imageWidth
         return composedScale * widgetToImageRatio
+    }
+
+    // MARK: - Data Overlay (systemLarge EQ/Playlist zones)
+
+    @ViewBuilder
+    private func dataOverlay(in size: CGSize) -> some View {
+        let eqText = dataText(for: .eq)
+        let playlistTexts = dataTexts(for: .playlist)
+
+        // EQ zone: roughly Y=51%-64% of the 752px canvas (below main+controls, in EQ body)
+        if let eqText {
+            Text(eqText)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(skin.clockColor.opacity(0.9))
+                .lineLimit(3)
+                .multilineTextAlignment(.center)
+                .frame(width: size.width * 0.8)
+                .position(x: size.width * 0.5, y: size.height * 0.58)
+        }
+
+        // Playlist zone: Y=75%-95% — show as track list
+        if !playlistTexts.isEmpty {
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(Array(playlistTexts.enumerated()), id: \.offset) { index, text in
+                    Text("\(index + 1). \(text)")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(skin.clockColor.opacity(0.85))
+                        .lineLimit(1)
+                }
+            }
+            .frame(width: size.width * 0.85, alignment: .leading)
+            .position(x: size.width * 0.5, y: size.height * 0.82)
+        }
+    }
+
+    /// Get single display text for a zone (first matching data source)
+    private func dataText(for zone: DataSource.DisplayZone) -> String? {
+        let sources = DataSource.loadAll().filter { $0.zone == zone }
+        for source in sources {
+            if let value = entry.fetchedData[source.id.uuidString] {
+                return value
+            }
+        }
+        return nil
+    }
+
+    /// Get all display texts for a zone
+    private func dataTexts(for zone: DataSource.DisplayZone) -> [String] {
+        let sources = DataSource.loadAll().filter { $0.zone == zone }
+        return sources.compactMap { entry.fetchedData[$0.id.uuidString] }
+    }
+
+    private func dateString(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        return formatter.string(from: date)
     }
 
     // MARK: - Background

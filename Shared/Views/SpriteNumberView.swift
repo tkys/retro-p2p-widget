@@ -7,6 +7,7 @@ struct SpriteNumberView: View {
     let digitWidth: CGFloat
     let digitHeight: CGFloat
     let scale: CGFloat
+    var colonColor: Color = .white
 
     // Winamp numbers.bmp layout: digits 0-9 in a row, each digitWidth x digitHeight
     // Characters mapped: 0,1,2,3,4,5,6,7,8,9, then blank (index 10)
@@ -38,10 +39,10 @@ struct SpriteNumberView: View {
         // Draw a simple colon matching the sprite style
         VStack(spacing: scale * 3) {
             Circle()
-                .fill(Color.white)
+                .fill(colonColor)
                 .frame(width: scale * 2, height: scale * 2)
             Circle()
-                .fill(Color.white)
+                .fill(colonColor)
                 .frame(width: scale * 2, height: scale * 2)
         }
         .frame(width: scale * digitWidth * 0.4, height: scale * digitHeight)

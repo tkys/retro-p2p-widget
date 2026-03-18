@@ -15,16 +15,31 @@ struct RetroClockProvider: TimelineProvider {
         let skin = SkinLoader.selectedSkin()
         let now = Date()
         let calendar = Calendar.current
+        let dataSources = DataSource.loadAll()
 
-        var entries: [ClockEntry] = []
-        for minuteOffset in 0..<60 {
-            guard let entryDate = calendar.date(byAdding: .minute, value: minuteOffset, to: now) else { continue }
-            entries.append(ClockEntry(date: entryDate, skin: skin))
+        // If no data sources configured, skip network and return immediately
+        guard !dataSources.isEmpty else {
+            let entries = makeEntries(skin: skin, fetchedData: [:], from: now, calendar: calendar)
+            let nextUpdate = calendar.date(byAdding: .hour, value: 1, to: now) ?? now
+            completion(Timeline(entries: entries, policy: .after(nextUpdate)))
+            return
         }
 
-        let nextUpdate = calendar.date(byAdding: .hour, value: 1, to: now) ?? now
-        let timeline = Timeline(entries: entries, policy: .after(nextUpdate))
-        completion(timeline)
+        // Fetch data from configured sources
+        Task {
+            let fetchedData = await DataFetcher.fetchAll(sources: dataSources)
+            let entries = makeEntries(skin: skin, fetchedData: fetchedData, from: now, calendar: calendar)
+            // Shorter refresh interval when data sources are active (15 min)
+            let nextUpdate = calendar.date(byAdding: .minute, value: 15, to: now) ?? now
+            completion(Timeline(entries: entries, policy: .after(nextUpdate)))
+        }
+    }
+
+    private func makeEntries(skin: SkinDefinition, fetchedData: [String: String], from now: Date, calendar: Calendar) -> [ClockEntry] {
+        (0..<60).compactMap { minuteOffset in
+            guard let entryDate = calendar.date(byAdding: .minute, value: minuteOffset, to: now) else { return nil }
+            return ClockEntry(date: entryDate, skin: skin, fetchedData: fetchedData)
+        }
     }
 }
 

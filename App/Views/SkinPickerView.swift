@@ -40,6 +40,15 @@ struct SkinPickerView: View {
                 .tint(.primary)
             }
             .navigationTitle("Retro Clock Skins")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    NavigationLink {
+                        DataSourceListView()
+                    } label: {
+                        Image(systemName: "antenna.radiowaves.left.and.right")
+                    }
+                }
+            }
             .onAppear {
                 skins = SkinLoader.loadAll()
             }
